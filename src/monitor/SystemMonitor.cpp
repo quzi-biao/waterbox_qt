@@ -124,9 +124,6 @@ void SystemMonitor::collectAndReport() {
     
     m_sender->sendCommand("monitorInfo", jsonStr);
     
-    qInfo() << "上报系统监控数据 - CPU:" << QString::number(m_currentData.cpu * 100, 'f', 2) << "%"
-            << "内存:" << QString::number(m_currentData.mem * 100, 'f', 2) << "%"
-            << "磁盘:" << QString::number(m_currentData.disk * 100, 'f', 2) << "%";
 }
 
 void SystemMonitor::getSystemInfo() {

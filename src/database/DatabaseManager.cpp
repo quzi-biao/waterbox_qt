@@ -264,7 +264,6 @@ QList<MetricIndicator> DatabaseManager::loadMetricIndicators() {
         }
     }
     
-    qInfo() << "Loaded" << indicators.size() << "metric indicators from database";
     return indicators;
 }
 

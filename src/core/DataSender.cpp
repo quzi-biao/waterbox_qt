@@ -43,7 +43,6 @@ void DataSender::start() {
         return;
     }
     
-    qInfo() << "Starting data sender";
     m_started = true;
     m_sendTimer->start();
     m_adjustTimer->start();
@@ -52,7 +51,6 @@ void DataSender::start() {
 }
 
 void DataSender::stop() {
-    qInfo() << "Stopping data sender";
     m_started = false;
     m_sendTimer->stop();
     m_adjustTimer->stop();
@@ -71,18 +69,13 @@ void DataSender::addData(const QJsonObject& data) {
 }
 
 void DataSender::sendPendingData() {
-    qDebug() << "DataSender::sendPendingData() called";
-    
     if (!m_sender || !m_sender->isInitialized()) {
         return;
     }
     
     QList<PLCDataRecord> records = DatabaseManager::instance()->getUnuploadedData(100);
     
-    qInfo() << "Found" << records.size() << "unuploaded records in database";
-    
     if (records.isEmpty()) {
-        qDebug() << "No pending data to send";
         return;
     }
     
@@ -97,11 +90,7 @@ void DataSender::sendPendingData() {
     QMap<QString, qint64> addressToIdMap;
     for (const MetricIndicator& indicator : indicators) {
         addressToIdMap[indicator.address()] = indicator.id();
-        qDebug() << "  Mapping:" << indicator.address() << "->" << indicator.id();
     }
-    
-    qInfo() << "Loaded" << indicators.size() << "metric indicators from" << (m_collector ? "DataCollector" : "Database");
-    qDebug() << "Address map size:" << addressToIdMap.size();
     
     // 转换为QList<QJsonObject>格式，匹配Java的readIndicator返回格式
     // Java: ret.put("k", indicator.getId()); ret.put("v", value); ret.put("t", timestamp);
@@ -128,8 +117,6 @@ void DataSender::sendPendingData() {
         return;
     }
 
-    qInfo() << "Preparing to send" << dataList.size() << "metrics in one batch";
-    
     // 使用HttpSendData::createMetricData创建数据（完全匹配Java实现）
     QString uniqueId = m_sender->uniqueId();
     if (uniqueId.isEmpty()) {
@@ -146,23 +133,8 @@ void DataSender::sendPendingData() {
         return;
     }
     
-    qInfo() << "Sending batch with" << dataList.size() << "metrics";
-    
-    // 输出前5个指标用于调试
-    qDebug() << "Sample metrics (first 5):";
-    for (int i = 0; i < qMin(5, dataList.size()); i++) {
-        QJsonObject metric = dataList[i];
-        qDebug() << "  k=" << metric["k"].toVariant().toLongLong()
-                 << " v=" << metric["v"].toDouble()
-                 << " t=" << metric["t"].toVariant().toLongLong();
-    }
-    
-    qDebug() << "Content:" << httpData.content().left(100);
-    
     // 转换为JSON并发送
     QJsonObject sendData = httpData.toJson();
-    QJsonDocument debugDoc(sendData);
-    qInfo() << "Sending data:" << debugDoc.toJson(QJsonDocument::Compact).left(300);
     
     // 使用 HttpSender 发送
     m_sender->sendRawData(sendData);
@@ -172,7 +144,6 @@ void DataSender::sendPendingData() {
         DatabaseManager::instance()->markAsUploaded(id);
         emit dataSent(id);
     }
-    qInfo() << "Successfully sent" << dataList.size() << "metrics";
 }
 
 void DataSender::adjustSendFrequency() {
@@ -183,13 +154,11 @@ void DataSender::adjustSendFrequency() {
         if (newInterval != m_currentInterval) {
             m_currentInterval = newInterval;
             m_sendTimer->setInterval(m_currentInterval);
-            qInfo() << "Increased send frequency to" << m_currentInterval << "ms";
         }
     } else if (pending.isEmpty()) {
         if (m_currentInterval < m_baseInterval) {
             m_currentInterval = qMin(m_baseInterval, m_currentInterval * 2);
             m_sendTimer->setInterval(m_currentInterval);
-            qInfo() << "Decreased send frequency to" << m_currentInterval << "ms";
         }
     }
 }

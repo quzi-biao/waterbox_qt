@@ -33,7 +33,6 @@ bool PLCClient::connect(const QString& host, int port) {
     if (m_protocol->connect(host, port)) {
         m_connected = true;
         emit connected();
-        qInfo() << "Connected to PLC at" << host << ":" << port;
         return true;
     }
     
@@ -46,7 +45,6 @@ void PLCClient::disconnect() {
         m_protocol->disconnect();
         m_connected = false;
         emit disconnected();
-        qInfo() << "Disconnected from PLC";
     }
 }
 

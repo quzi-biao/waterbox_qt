@@ -48,14 +48,12 @@ DataCollector::~DataCollector() {
 }
 
 void DataCollector::startCollection() {
-    qInfo() << "Starting data collection";
     m_timer->start();
     // 立即采集一次
     collectData();
 }
 
 void DataCollector::stopCollection() {
-    qInfo() << "Stopping data collection";
     m_timer->stop();
 }
 
@@ -114,8 +112,6 @@ void DataCollector::collectData() {
     QJsonArray indicators = doc.array();
     qint64 timestamp = QDateTime::currentMSecsSinceEpoch();
     
-    qInfo() << "开始采集" << indicators.size() << "个 PLC 地址的数据";
-    
     QMap<QString, QVariant> collectedData;  // 用于界面显示
     int successCount = 0;
     int failCount = 0;
@@ -139,7 +135,6 @@ void DataCollector::collectData() {
         
         if (!rawValue.isValid() || rawValue.isNull()) {
             failCount++;
-            qDebug() << "读取失败:" << address << "类型:" << dataType;
         } else {
             successCount++;
             collectedData[address] = rawValue;
@@ -147,7 +142,6 @@ void DataCollector::collectData() {
             // 保存到数据库
             DatabaseManager::instance()->saveData(address, rawValue, rawValue);
             
-            qDebug() << "读取成功:" << address << "=" << rawValue << "类型:" << dataType;
         }
     }
     
@@ -156,7 +150,8 @@ void DataCollector::collectData() {
     
     m_latestData = collectedData;
     
-    qInfo() << "数据采集完成，共" << collectedData.size() << "项，成功:" << successCount << "失败:" << failCount;
+    Q_UNUSED(successCount);
+    Q_UNUSED(failCount);
     
     // 如果失败太多，发送错误信号
     if (successCount == 0 && failCount > 0) {

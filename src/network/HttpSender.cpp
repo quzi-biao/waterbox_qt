@@ -128,8 +128,6 @@ void HttpSender::sendCommand(const QString& cmd, const QString& content, const Q
     QJsonDocument doc(httpData.toJson());
     QByteArray postData = doc.toJson(QJsonDocument::Compact);
     
-    qInfo() << "发送命令:" << cmd << "内容:" << httpData.content();
-    
     QNetworkRequest request(m_metricUpUrl);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     
@@ -146,8 +144,6 @@ void HttpSender::sendRawData(const QJsonObject& httpSendData) {
     QByteArray postData = doc.toJson(QJsonDocument::Compact);
     
     QString protocol = httpSendData.value("protocol").toString();
-    qInfo() << "发送数据 - Protocol:" << protocol << "URL:" << m_metricUpUrl;
-    qDebug() << "Post data size:" << postData.size() << "bytes";
     
     QNetworkRequest request(m_metricUpUrl);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -158,7 +154,6 @@ void HttpSender::sendRawData(const QJsonObject& httpSendData) {
     connect(reply, &QNetworkReply::finished, this, [this, reply, protocol]() {
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray response = reply->readAll();
-            qInfo() << "发送成功 - Protocol:" << protocol << "Response:" << response;
             emit responseReceived(response);
         } else {
             qWarning() << "发送失败 - Protocol:" << protocol 

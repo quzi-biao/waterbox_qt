@@ -19,7 +19,6 @@ bool Snap7Simple::connect(const QString& host, int port) {
         return false;
     }
     
-    qInfo() << "Snap7Simple: TCP 连接成功";
     
     // S200 SMART 可能需要特定的 TSAP 组合
     // 尝试多种常见的 TSAP 配置
@@ -38,18 +37,16 @@ bool Snap7Simple::connect(const QString& host, int port) {
     
     for (const auto& config : configs) {
         if (sendCOTPConnectWithTSAP(config.srcHigh, config.srcLow, config.dstHigh, config.dstLow)) {
-            qInfo() << "S7: COTP 握手成功";
             
             // 发送 S7 通信设置
             if (sendS7Setup()) {
                 m_connected = true;
-                qInfo() << "Snap7Simple: 连接完全建立";
+                
                 return true;
             }
         }
     }
     
-    qWarning() << "Snap7Simple: 所有 TSAP 配置都失败";
     return false;
 }
 
@@ -118,7 +115,6 @@ bool Snap7Simple::sendCOTPConnect() {
     for (int i = 0; i < request.size(); i++) {
         hex += QString("%1 ").arg((quint8)request.at(i), 2, 16, QChar('0')).toUpper();
     }
-    qDebug() << "Snap7Simple COTP 请求:" << hex;
     
     m_socket->write(request);
     m_socket->waitForBytesWritten(1000);
@@ -137,7 +133,6 @@ bool Snap7Simple::sendCOTPConnect() {
         for (int i = 0; i < response.size(); i++) {
             respHex += QString("%1 ").arg((quint8)response.at(i), 2, 16, QChar('0')).toUpper();
         }
-        qDebug() << "Snap7Simple COTP 响应:" << respHex;
     }
     
     return response.size() >= 7;

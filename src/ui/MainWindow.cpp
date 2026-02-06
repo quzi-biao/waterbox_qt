@@ -246,8 +246,6 @@ void MainWindow::onConnectPLC() {
         m_plcConnectionLabel->setStyleSheet("QLabel { padding: 5px; color: #ffaa00; font-weight: bold; }");
         m_reconnectBtn->setVisible(false);
         
-        qInfo() << "正在连接 PLC:" << host << ":" << port;
-        
         // 延迟启动系统，给 PLC 连接时间
         QTimer::singleShot(1000, this, &MainWindow::onStartSystem);
     }
@@ -272,12 +270,10 @@ void MainWindow::autoConnectPLC() {
         return;
     }
     
-    qInfo() << "尝试连接 PLC...";
     onConnectPLC();
 }
 
 void MainWindow::onConfigUpdated() {
-    qInfo() << "配置已更新，重新连接 PLC";
     
     // 停止当前连接
     if (m_systemRunning) {
@@ -319,7 +315,6 @@ void MainWindow::onStartSystem() {
     QList<PLCDataRecord> unuploaded = DatabaseManager::instance()->getUnuploadedData(10000);
     m_dataCountLabel->setText(QString("未上报: %1").arg(unuploaded.size()));
     
-    qInfo() << "系统已启动";
 }
 
 void MainWindow::onStopSystem() {
@@ -332,7 +327,6 @@ void MainWindow::onStopSystem() {
     m_systemRunning = false;
     
     m_statusLabel->setText("系统已停止");
-    qInfo() << "系统已停止";
 }
 
 void MainWindow::updateStatusBar() {

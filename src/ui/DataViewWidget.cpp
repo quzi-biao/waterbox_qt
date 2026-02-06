@@ -138,9 +138,6 @@ void DataViewWidget::loadMetricIndicators() {
 }
 
 void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
-    qDebug() << "DataViewWidget::updateData called with" << data.size() << "items";
-    qDebug() << "Address names count:" << m_addressNames.size();
-    
     // 更新时间
     qint64 timestamp = data.value("_timestamp", QDateTime::currentMSecsSinceEpoch()).toLongLong();
     QString currentTime = QDateTime::fromMSecsSinceEpoch(timestamp).toString("yyyy-MM-dd hh:mm:ss");
@@ -196,7 +193,6 @@ void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
     }
     
     // 先显示非BOOL数据
-    qDebug() << "Creating" << otherData.size() << "non-BOOL cards";
     for (const auto& pair : otherData) {
         QString address = pair.first;
         QString name = m_addressNames.value(address, address);
@@ -219,7 +215,6 @@ void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
             value = pair.second.toString();
         }
         
-        qDebug() << "Creating card:" << name << "=" << value << unit << "(" << address << ")";
         QWidget* card = createDataCard(name, value, unit, address, cardWidth);
         gridLayout->addWidget(card, row, col);
         
@@ -255,6 +250,4 @@ void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
     m_cardsContainer->updateGeometry();
     m_scrollArea->updateGeometry();
     
-    qDebug() << "Total cards created:" << (otherData.size() + boolData.size());
-    qDebug() << "Grid layout rows:" << row + 1 << "cols:" << maxCols;
 }
