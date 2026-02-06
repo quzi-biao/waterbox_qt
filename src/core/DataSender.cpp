@@ -1,13 +1,22 @@
 #include "DataSender.h"
-#include "interfaces/IDataReporter.h"
+#include "network/HttpSender.h"
+#include "network/HttpSendData.h"
 #include "database/DatabaseManager.h"
+#include "entity/MetricIndicator.h"
+#include "core/DataCollector.h"
 #include "ConfigManager.h"
 #include <QDebug>
 #include <QThread>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QHash>
+#include <QMap>
 
-DataSender::DataSender(IDataReporter* reporter, QObject* parent)
+DataSender::DataSender(HttpSender* sender, QObject* parent)
     : QObject(parent), 
-      m_reporter(reporter),
+      m_sender(sender),
+      m_collector(nullptr),
       m_baseInterval(10000),
       m_minInterval(1000),
       m_currentInterval(10000),
@@ -19,6 +28,10 @@ DataSender::DataSender(IDataReporter* reporter, QObject* parent)
     m_adjustTimer = new QTimer(this);
     m_adjustTimer->setInterval(5000);
     connect(m_adjustTimer, &QTimer::timeout, this, &DataSender::adjustSendFrequency);
+
+    if (m_sender) {
+        connect(m_sender, &HttpSender::publicKeyReceived, this, &DataSender::sendPendingData);
+    }
     
     m_baseInterval = ConfigManager::instance()->reportInterval();
     m_currentInterval = m_baseInterval;
@@ -58,37 +71,108 @@ void DataSender::addData(const QJsonObject& data) {
 }
 
 void DataSender::sendPendingData() {
-    if (!m_reporter || !m_reporter->isConnected()) {
-        qWarning() << "Reporter not connected";
+    qDebug() << "DataSender::sendPendingData() called";
+    
+    if (!m_sender || !m_sender->isInitialized()) {
         return;
     }
     
     QList<PLCDataRecord> records = DatabaseManager::instance()->getUnuploadedData(100);
     
+    qInfo() << "Found" << records.size() << "unuploaded records in database";
+    
     if (records.isEmpty()) {
+        qDebug() << "No pending data to send";
         return;
     }
     
-    qInfo() << "Sending" << records.size() << "pending records";
+    // 从DataCollector获取MetricIndicator配置，建立address到id的映射
+    QList<MetricIndicator> indicators;
+    if (m_collector) {
+        indicators = m_collector->getMetricIndicators();
+    } else {
+        indicators = DatabaseManager::instance()->loadMetricIndicators();
+    }
+    
+    QMap<QString, qint64> addressToIdMap;
+    for (const MetricIndicator& indicator : indicators) {
+        addressToIdMap[indicator.address()] = indicator.id();
+        qDebug() << "  Mapping:" << indicator.address() << "->" << indicator.id();
+    }
+    
+    qInfo() << "Loaded" << indicators.size() << "metric indicators from" << (m_collector ? "DataCollector" : "Database");
+    qDebug() << "Address map size:" << addressToIdMap.size();
+    
+    // 转换为QList<QJsonObject>格式，匹配Java的readIndicator返回格式
+    // Java: ret.put("k", indicator.getId()); ret.put("v", value); ret.put("t", timestamp);
+    QList<QJsonObject> dataList;
+    QList<qint64> recordIds;
     
     for (const PLCDataRecord& record : records) {
-        QJsonObject data;
-        data["id"] = record.id;
-        data["timestamp"] = record.timestamp.toMSecsSinceEpoch();
-        data["address"] = record.address;
-        data["raw_value"] = record.rawValue.toString();
-        data["corrected_value"] = record.correctedValue.toString();
-        
-        if (m_reporter->reportData(data)) {
-            DatabaseManager::instance()->markAsUploaded(record.id);
-            emit dataSent(record.id);
-            
-            QThread::msleep(200);
-        } else {
-            emit sendError("Failed to send data");
-            break;
+        if (!addressToIdMap.contains(record.address)) {
+            qWarning() << "Address not found in MetricIndicator:" << record.address;
+            continue;
         }
+
+        QJsonObject metric;
+        metric["k"] = static_cast<qint64>(addressToIdMap[record.address]);  // k = MetricIndicator的id
+        metric["v"] = record.correctedValue.toDouble();  // v = 值
+        metric["t"] = record.timestamp.toMSecsSinceEpoch();  // t = 时间戳（毫秒）
+
+        dataList.append(metric);
+        recordIds.append(record.id);
     }
+    
+    if (dataList.isEmpty()) {
+        qWarning() << "No metrics to send after address-id mapping";
+        return;
+    }
+
+    qInfo() << "Preparing to send" << dataList.size() << "metrics in one batch";
+    
+    // 使用HttpSendData::createMetricData创建数据（完全匹配Java实现）
+    QString uniqueId = m_sender->uniqueId();
+    if (uniqueId.isEmpty()) {
+        qWarning() << "UniqueId is empty! Cannot send data.";
+        return;
+    }
+    
+    QString tag = ConfigManager::instance()->get("tag", "").toString();
+    HttpSendData httpData = HttpSendData::createMetricData(
+        uniqueId, dataList, QByteArray(), QByteArray(), tag);
+    
+    if (httpData.content().isEmpty()) {
+        qWarning() << "Failed to create metric data";
+        return;
+    }
+    
+    qInfo() << "Sending batch with" << dataList.size() << "metrics";
+    
+    // 输出前5个指标用于调试
+    qDebug() << "Sample metrics (first 5):";
+    for (int i = 0; i < qMin(5, dataList.size()); i++) {
+        QJsonObject metric = dataList[i];
+        qDebug() << "  k=" << metric["k"].toVariant().toLongLong()
+                 << " v=" << metric["v"].toDouble()
+                 << " t=" << metric["t"].toVariant().toLongLong();
+    }
+    
+    qDebug() << "Content:" << httpData.content().left(100);
+    
+    // 转换为JSON并发送
+    QJsonObject sendData = httpData.toJson();
+    QJsonDocument debugDoc(sendData);
+    qInfo() << "Sending data:" << debugDoc.toJson(QJsonDocument::Compact).left(300);
+    
+    // 使用 HttpSender 发送
+    m_sender->sendRawData(sendData);
+    
+    // 标记所有数据为已上传
+    for (qint64 id : recordIds) {
+        DatabaseManager::instance()->markAsUploaded(id);
+        emit dataSent(id);
+    }
+    qInfo() << "Successfully sent" << dataList.size() << "metrics";
 }
 
 void DataSender::adjustSendFrequency() {

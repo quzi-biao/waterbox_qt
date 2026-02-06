@@ -74,7 +74,6 @@ private:
     
     // 工作线程
     QThread* m_collectorThread;
-    QThread* m_senderThread;
     
     bool m_systemRunning;
     bool m_simulatorMode;

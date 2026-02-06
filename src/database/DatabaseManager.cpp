@@ -1,9 +1,14 @@
 #include "DatabaseManager.h"
+#include "entity/MetricIndicator.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include <QMutexLocker>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 
 DatabaseManager* DatabaseManager::m_instance = nullptr;
 
@@ -232,6 +237,35 @@ QMap<QString, QVariant> DatabaseManager::getLatestData() {
     }
     
     return latestData;
+}
+
+QList<MetricIndicator> DatabaseManager::loadMetricIndicators() {
+    QList<MetricIndicator> indicators;
+
+    // 使用与 PLCAddressConfigWidget 相同的读取方式（getKeyValue 内部加锁）
+    QVariant indicatorValue = getKeyValue("METRIC_INDICATOR_KEY");
+    if (indicatorValue.isNull() || indicatorValue.toString().isEmpty()) {
+        return indicators;
+    }
+
+    QString jsonStr = indicatorValue.toString();
+    
+    // 解析JSON数组
+    QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
+    if (!doc.isArray()) {
+        qWarning() << "Invalid metric indicators JSON format";
+        return indicators;
+    }
+    
+    QJsonArray array = doc.array();
+    for (const QJsonValue& value : array) {
+        if (value.isObject()) {
+            indicators.append(MetricIndicator::fromJson(value.toObject()));
+        }
+    }
+    
+    qInfo() << "Loaded" << indicators.size() << "metric indicators from database";
+    return indicators;
 }
 
 void DatabaseManager::cleanOldData(int daysToKeep) {

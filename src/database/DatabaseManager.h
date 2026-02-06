@@ -37,6 +37,8 @@ public:
     bool saveKeyValue(const QString& key, const QVariant& value);
     QVariant getKeyValue(const QString& key, const QVariant& defaultValue = QVariant());
     
+    QList<class MetricIndicator> loadMetricIndicators();
+    
     void cleanOldData(int daysToKeep = 365);
     
 private:

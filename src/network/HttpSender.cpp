@@ -31,7 +31,10 @@ void HttpSender::initialize() {
     m_uniqueId = getUniqueId();
     getBoxRsaKeys();
     
-    QString serviceAddress = ConfigManager::instance()->get("service_address", "").toString();
+    QString serviceAddress = ConfigManager::instance()->get("serviceAddress", "").toString();
+    if (serviceAddress.isEmpty()) {
+        serviceAddress = ConfigManager::instance()->get("service_address", "").toString();
+    }
     
     if (serviceAddress.isEmpty()) {
         m_ignore = true;
@@ -55,6 +58,10 @@ void HttpSender::initialize() {
 
 void HttpSender::sendMetrics(const QList<QJsonObject>& datas) {
     if (m_ignore || !m_initialized) {
+        return;
+    }
+    
+    if (datas.isEmpty()) {
         return;
     }
     
@@ -128,6 +135,38 @@ void HttpSender::sendCommand(const QString& cmd, const QString& content, const Q
     
     QNetworkReply* reply = m_networkManager->post(request, postData);
     connect(reply, &QNetworkReply::finished, this, &HttpSender::onDataReplyFinished);
+}
+
+void HttpSender::sendRawData(const QJsonObject& httpSendData) {
+    if (m_ignore || !m_initialized) {
+        return;
+    }
+    
+    QJsonDocument doc(httpSendData);
+    QByteArray postData = doc.toJson(QJsonDocument::Compact);
+    
+    QString protocol = httpSendData.value("protocol").toString();
+    qInfo() << "发送数据 - Protocol:" << protocol << "URL:" << m_metricUpUrl;
+    qDebug() << "Post data size:" << postData.size() << "bytes";
+    
+    QNetworkRequest request(m_metricUpUrl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    
+    QNetworkReply* reply = m_networkManager->post(request, postData);
+    
+    // 添加lambda来捕获响应
+    connect(reply, &QNetworkReply::finished, this, [this, reply, protocol]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            qInfo() << "发送成功 - Protocol:" << protocol << "Response:" << response;
+            emit responseReceived(response);
+        } else {
+            qWarning() << "发送失败 - Protocol:" << protocol 
+                      << "Error:" << reply->errorString()
+                      << "HTTP Status:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        }
+        reply->deleteLater();
+    });
 }
 
 void HttpSender::getServicePublicKey() {

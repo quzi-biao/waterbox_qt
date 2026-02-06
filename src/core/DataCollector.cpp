@@ -14,14 +14,33 @@ DataCollector::DataCollector(IPLCClient* plcClient, QObject* parent)
     : QObject(parent), 
       m_plcClient(plcClient) {
     
+    // 初始化时加载配置
+    DatabaseManager* db = DatabaseManager::instance();
+    QVariant indicatorValue = db->getKeyValue("METRIC_INDICATOR_KEY");
+    
+    if (!indicatorValue.isNull() && !indicatorValue.toString().isEmpty()) {
+        QString jsonStr = indicatorValue.toString();
+        QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
+        
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue& val : array) {
+                if (val.isObject()) {
+                    QJsonObject obj = val.toObject();
+                    QString address = obj.value("address").toString();
+                    if (!address.isEmpty()) {
+                        m_dataSchema[address] = QString::number(obj.value("dataType").toInt());
+                    }
+                }
+            }
+        }
+    }
+    
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &DataCollector::collectData);
     
     // 设置 10 秒采集间隔
     m_timer->setInterval(10000);
-    
-    // 加载 MetricIndicator 配置
-    loadMetricIndicators();
 }
 
 DataCollector::~DataCollector() {
@@ -49,51 +68,18 @@ void DataCollector::setDataSchema(const QMap<QString, QString>& schema) {
     m_dataSchema = schema;
 }
 
-void DataCollector::loadMetricIndicators() {
-    m_dataSchema.clear();
-    
-    DatabaseManager* db = DatabaseManager::instance();
-    QVariant indicatorValue = db->getKeyValue("METRIC_INDICATOR_KEY");
-    
-    if (indicatorValue.isNull() || indicatorValue.toString().isEmpty()) {
-        qWarning() << "没有配置 PLC 监控地址";
-        return;
-    }
-    
-    QString jsonStr = indicatorValue.toString();
-    QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
-    
-    if (!doc.isArray()) {
-        qWarning() << "MetricIndicator 配置格式错误";
-        return;
-    }
-    
-    QJsonArray array = doc.array();
-    for (const QJsonValue& val : array) {
-        if (!val.isObject()) {
-            continue;
-        }
-        
-        MetricIndicator indicator = MetricIndicator::fromJson(val.toObject());
-        QString address = indicator.address();
-        
-        if (!address.isEmpty()) {
-            // 使用地址作为 key，数据类型作为 value
-            m_dataSchema[address] = QString::number(indicator.dataType());
-        }
-    }
-    
-    qInfo() << "加载了" << m_dataSchema.size() << "个 PLC 监控地址";
-}
-
 QMap<QString, QVariant> DataCollector::getLatestData() const {
     return m_latestData;
+}
+
+QList<MetricIndicator> DataCollector::getMetricIndicators() const {
+    return DatabaseManager::instance()->loadMetricIndicators();
 }
 
 void DataCollector::collectData() {
     // 重新加载配置（以防配置更新）
     if (m_dataSchema.isEmpty()) {
-        loadMetricIndicators();
+        // 配置为空，跳过采集
     }
     
     if (m_dataSchema.isEmpty()) {

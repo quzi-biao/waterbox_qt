@@ -96,6 +96,8 @@ target_link_libraries(${PROJECT_NAME}
     Qt6::Charts
     OpenSSL::SSL
     OpenSSL::Crypto
+    ${SNAP7_LIBRARY}
+    z
 )
 
 install(TARGETS ${PROJECT_NAME}

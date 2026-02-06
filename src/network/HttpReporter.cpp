@@ -35,6 +35,9 @@ bool HttpReporter::reportData(const QJsonObject& data) {
     QJsonDocument doc(data);
     QByteArray jsonData = doc.toJson();
     
+    qDebug() << "Sending HTTP POST to:" << m_url;
+    qDebug() << "Data:" << jsonData.left(200);  // 只显示前200字节
+    
     QNetworkReply* reply = m_manager->post(request, jsonData);
     
     QEventLoop loop;
@@ -52,15 +55,19 @@ bool HttpReporter::reportData(const QJsonObject& data) {
         
         if (reply->error() == QNetworkReply::NoError) {
             m_lastResponse = reply->readAll();
+            qInfo() << "HTTP report SUCCESS - Response:" << m_lastResponse.left(100);
             reply->deleteLater();
             emit reportSuccess();
             return true;
         } else {
-            qWarning() << "HTTP report failed:" << reply->errorString();
+            qWarning() << "HTTP report FAILED:" << reply->errorString();
+            qWarning() << "Error code:" << reply->error();
+            qWarning() << "URL:" << m_url;
             emit reportFailed(reply->errorString());
         }
     } else {
-        qWarning() << "HTTP report timeout";
+        qWarning() << "HTTP report TIMEOUT after 10 seconds";
+        qWarning() << "URL:" << m_url;
         reply->abort();
         emit reportFailed("Timeout");
     }

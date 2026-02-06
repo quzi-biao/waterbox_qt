@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QDebug>
+#include <zlib.h>
 
 HttpSendData::HttpSendData() {
 }
@@ -19,6 +20,41 @@ QJsonObject HttpSendData::toJson() const {
     return obj;
 }
 
+// GZIP压缩函数（与DataSender中的相同）
+static QByteArray gzipCompressData(const QByteArray& data) {
+    if (data.isEmpty()) {
+        return QByteArray();
+    }
+    
+    z_stream stream;
+    stream.zalloc = Z_NULL;
+    stream.zfree = Z_NULL;
+    stream.opaque = Z_NULL;
+    
+    if (deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        return QByteArray();
+    }
+    
+    stream.avail_in = data.size();
+    stream.next_in = (Bytef*)data.data();
+    
+    QByteArray compressed;
+    compressed.resize(data.size() + 1024);
+    
+    stream.avail_out = compressed.size();
+    stream.next_out = (Bytef*)compressed.data();
+    
+    if (deflate(&stream, Z_FINISH) != Z_STREAM_END) {
+        deflateEnd(&stream);
+        return QByteArray();
+    }
+    
+    compressed.resize(stream.total_out);
+    deflateEnd(&stream);
+    
+    return compressed;
+}
+
 HttpSendData HttpSendData::createMetricData(const QString& uniqueId,
                                             const QList<QJsonObject>& datas,
                                             const QByteArray& boxPrivateKey,
@@ -30,18 +66,28 @@ HttpSendData HttpSendData::createMetricData(const QString& uniqueId,
         return result;
     }
     
+    // 1. JSONObject.toJSONString(datas)
     QJsonArray jsonArray;
     for (const QJsonObject& obj : datas) {
         jsonArray.append(obj);
     }
-    
     QJsonDocument doc(jsonArray);
     QString jsonStr = doc.toJson(QJsonDocument::Compact);
     
-    QByteArray compressed = qCompress(jsonStr.toUtf8(), 9);
-    QString encoded = compressed.toBase64();
+    // 2. CompressUtils.gzipCompress(str)
+    QByteArray compressed = gzipCompressData(jsonStr.toUtf8());
     
-    result.setContent(uniqueId + ":" + QJsonDocument(QJsonArray{encoded}).toJson(QJsonDocument::Compact));
+    // 3. Base64Encoder.encode(data)
+    QString encoded = QString::fromLatin1(compressed.toBase64());
+    
+    // 4. JSONObject.toJSONString(encode) - 将字符串序列化为JSON字符串
+    QJsonDocument encodeDoc(QJsonArray{encoded});
+    QString encodeJsonStr = encodeDoc.toJson(QJsonDocument::Compact);
+    // 去掉数组的 [ ]
+    encodeJsonStr = encodeJsonStr.mid(1, encodeJsonStr.length() - 2);
+    
+    // 5. uniqueId + ":" + jsonString
+    result.setContent(uniqueId + ":" + encodeJsonStr);
     result.setProtocol("pumpMetrics");
     result.setTag(tag);
     

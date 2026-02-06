@@ -31,8 +31,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_systemRunning(false),
       m_simulatorMode(false),
       m_pressureTestMode(false),
-      m_collectorThread(nullptr),
-      m_senderThread(nullptr) {
+      m_collectorThread(nullptr) {
     
     setWindowTitle("WaterBox Qt - 水务监控系统");
     resize(1200, 800);
@@ -65,11 +64,6 @@ MainWindow::~MainWindow() {
     if (m_collectorThread) {
         m_collectorThread->quit();
         m_collectorThread->wait();
-    }
-    
-    if (m_senderThread) {
-        m_senderThread->quit();
-        m_senderThread->wait();
     }
     
     // 删除在工作线程中的对象
@@ -115,19 +109,15 @@ void MainWindow::initializeSystem() {
     
     m_collectorThread->start();
     
-    // 创建数据发送工作线程
-    HttpReporter* reporter = new HttpReporter();
-    m_senderThread = new QThread(this);
-    m_sender = new DataSender(reporter);
-    m_sender->moveToThread(m_senderThread);
-    reporter->moveToThread(m_senderThread);
-    
-    m_senderThread->start();
-    
-    m_pressureController = new PressureController(m_plcClient, this);
-    
+    // 先创建 HttpSender
     m_httpSender = new HttpSender(this);
     m_httpSender->initialize();
+    
+    // 创建数据发送器，保持在主线程（因为要使用 HttpSender）
+    m_sender = new DataSender(m_httpSender, this);
+    m_sender->setDataCollector(m_collector);
+    
+    m_pressureController = new PressureController(m_plcClient, this);
     
     m_responseHandle = new ServiceResponseHandle(this);
     m_responseHandle->initialize(m_httpSender);
@@ -140,8 +130,6 @@ void MainWindow::initializeSystem() {
     m_systemMonitor->start();
     
     RemoteConfigReceiver* configReceiver = new RemoteConfigReceiver(this);
-    connect(reporter, &HttpReporter::responseReceived,
-            configReceiver, &RemoteConfigReceiver::processResponse);
     connect(m_httpSender, &HttpSender::responseReceived,
             [configReceiver](const QByteArray& data) {
                 configReceiver->processResponse(QString::fromUtf8(data));

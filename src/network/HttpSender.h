@@ -26,6 +26,8 @@ public:
     
     void sendCommand(const QString& cmd, const QString& content, const QJsonObject& exData = QJsonObject());
     
+    void sendRawData(const QJsonObject& httpSendData);
+    
     QString uniqueId() const { return m_uniqueId; }
     
     bool isInitialized() const { return m_initialized; }

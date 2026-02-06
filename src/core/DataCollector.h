@@ -5,8 +5,10 @@
 #include <QTimer>
 #include <QMap>
 #include <QVariant>
+#include <QList>
 
 class IPLCClient;
+class MetricIndicator;
 class PLCClient;
 class DatabaseManager;
 
@@ -22,7 +24,7 @@ public:
     Q_INVOKABLE void setInterval(int milliseconds);
     
     Q_INVOKABLE void setDataSchema(const QMap<QString, QString>& schema);
-    Q_INVOKABLE void loadMetricIndicators();
+    QList<MetricIndicator> getMetricIndicators() const;
     Q_INVOKABLE QMap<QString, QVariant> getLatestData() const;
     
 signals:
