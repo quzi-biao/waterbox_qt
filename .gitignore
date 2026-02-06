@@ -1,0 +1,8 @@
+build/
+*.user
+*.autosave
+*.pro.user*
+CMakeLists.txt.user
+.DS_Store
+*.db
+config.json
