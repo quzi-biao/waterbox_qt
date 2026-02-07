@@ -92,69 +92,43 @@ upload_to_oss() {
 
 echo "=== WaterBox Qt 打包脚本 ==="
 
-# ===== 容器内：编译和打包 =====
-if [ -f /.dockerenv ] || [ "${IN_DOCKER:-0}" = "1" ]; then
-    export DEBIAN_FRONTEND=noninteractive
+# ===== 安装依赖 =====
+echo "[1/3] 安装编译依赖..."
+sudo apt update
+sudo apt install -y build-essential cmake dpkg-dev file \
+    qtbase5-dev libqt5charts5-dev libqt5sql5-sqlite \
+    libssl-dev zlib1g-dev
 
-    echo "[1/3] 安装编译依赖..."
-    apt update
-    apt install -y build-essential cmake dpkg-dev file \
-        qt6-base-dev libqt6charts6-dev libqt6sql6-sqlite \
-        libssl-dev zlib1g-dev \
-        libgl-dev libegl-dev libxkbcommon-dev
+# ===== 编译 =====
+echo "[2/3] 编译项目..."
+cd "$SCRIPT_DIR"
+rm -rf build && mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
 
-    echo "[2/3] 编译项目..."
-    cd /src
-    rm -rf build && mkdir -p build && cd build
-    cmake ..
-    make -j$(nproc)
+# ===== 打包 =====
+echo "[3/3] 生成 DEB 包..."
+cpack -G DEB
 
-    echo "[3/3] 生成 DEB 包..."
-    cpack -G DEB
+DEB_FILE=$(ls *.deb 2>/dev/null | head -1)
+if [ -z "$DEB_FILE" ]; then
+    echo "错误: 未找到 .deb 文件"
+    exit 1
+fi
 
-    DEB_FILE=$(ls *.deb 2>/dev/null | head -1)
-    if [ -n "$DEB_FILE" ]; then
-        cp "$DEB_FILE" /src/
-        echo "容器内打包完成: /src/$DEB_FILE"
-    else
-        echo "错误: 未找到 .deb 文件"
-        exit 1
-    fi
+DEB_PATH="$(pwd)/$DEB_FILE"
+echo ""
+echo "========================================="
+echo "打包成功！"
+echo "文件: $DEB_PATH"
+echo "安装命令: sudo dpkg -i $DEB_FILE"
+echo "========================================="
 
-# ===== 宿主机：启动 Docker 编译，然后上传 =====
+# 上传到阿里云 OSS
+if [ "$OSS_ENABLED" = true ]; then
+    upload_to_oss "$DEB_PATH"
 else
-    if ! command -v docker &>/dev/null; then
-        echo "错误: 需要安装 Docker"
-        echo "请安装: https://docs.docker.com/engine/install/"
-        exit 1
-    fi
-
-    echo "使用 Docker (Ubuntu 22.04) 编译..."
-    docker run --rm \
-        -v "$SCRIPT_DIR":/src \
-        -e IN_DOCKER=1 \
-        ubuntu:22.04 \
-        bash /src/build_deb.sh
-
-    DEB_FILE=$(ls "$SCRIPT_DIR"/*.deb 2>/dev/null | head -1)
-    if [ -z "$DEB_FILE" ]; then
-        echo "错误: 未找到 .deb 文件"
-        exit 1
-    fi
-
     echo ""
-    echo "========================================="
-    echo "打包成功！"
-    echo "文件: $DEB_FILE"
-    echo "安装命令: sudo dpkg -i $(basename $DEB_FILE)"
-    echo "========================================="
-
-    # 上传到阿里云 OSS
-    if [ "$OSS_ENABLED" = true ]; then
-        upload_to_oss "$DEB_FILE"
-    else
-        echo ""
-        echo "未配置 OSS 参数，跳过上传。"
-        echo "添加 --endpoint --key-id --key-secret --bucket 参数可自动上传。"
-    fi
+    echo "未配置 OSS 参数，跳过上传。"
+    echo "添加 --endpoint --key-id --key-secret --bucket 参数可自动上传。"
 fi

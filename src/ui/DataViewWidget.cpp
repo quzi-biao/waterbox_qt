@@ -194,7 +194,7 @@ void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
             continue;
         }
         
-        if (it.value().typeId() == QMetaType::Bool) {
+        if (it.value().type() == QVariant::Bool) {
             boolData.append(qMakePair(it.key(), it.value()));
         } else {
             otherData.append(qMakePair(it.key(), it.value()));
@@ -208,7 +208,7 @@ void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
         QString unit = m_addressUnits.value(address, "");
         QString value;
         
-        if (pair.second.typeId() == QMetaType::Double || pair.second.typeId() == QMetaType::Float) {
+        if (pair.second.type() == QVariant::Double) {
             double numValue = pair.second.toDouble();
             // 异常值（小于-1000）显示为横线
             if (numValue < -1000) {

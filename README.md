@@ -100,7 +100,7 @@ waterbox_qt/
 
 ### 依赖要求
 
-- Qt 6.x（Core, Widgets, Network, Sql, Charts）
+- Qt 5.15（Core, Widgets, Network, Sql, Charts）
 - OpenSSL
 - CMake 3.16+
 - C++17 编译器
@@ -110,7 +110,7 @@ waterbox_qt/
 ```bash
 # 安装依赖
 sudo apt install -y build-essential cmake \
-    qt6-base-dev libqt6charts6-dev libqt6sql6-sqlite \
+    qtbase5-dev libqt5charts5-dev libqt5sql5-sqlite \
     libssl-dev zlib1g-dev
 
 # 编译

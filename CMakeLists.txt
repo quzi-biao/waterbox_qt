@@ -7,8 +7,16 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# 查找 Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network Sql Charts)
+# 查找 Qt（优先 Qt5，回退 Qt6）
+find_package(Qt5 QUIET COMPONENTS Core Widgets Network Sql Charts)
+if(Qt5_FOUND)
+    set(QT_VERSION_MAJOR 5)
+    message(STATUS "使用 Qt5: ${Qt5Core_VERSION}")
+else()
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network Sql Charts)
+    set(QT_VERSION_MAJOR 6)
+    message(STATUS "使用 Qt6: ${Qt6Core_VERSION}")
+endif()
 
 # 查找 OpenSSL
 find_package(OpenSSL REQUIRED)
@@ -91,11 +99,11 @@ set(SOURCES
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_link_libraries(${PROJECT_NAME}
-    Qt6::Core
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Sql
-    Qt6::Charts
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::Network
+    Qt${QT_VERSION_MAJOR}::Sql
+    Qt${QT_VERSION_MAJOR}::Charts
     OpenSSL::SSL
     OpenSSL::Crypto
     ${SNAP7_LIBRARY}
@@ -120,5 +128,7 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "quzi-biao")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    "${CMAKE_SOURCE_DIR}/packaging/postinst;${CMAKE_SOURCE_DIR}/packaging/postrm")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
 include(CPack)
