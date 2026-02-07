@@ -160,6 +160,8 @@ void MainWindow::setupUI() {
     if (m_responseHandle && m_responseHandle->commandHandler()) {
         connect(m_responseHandle->commandHandler(), &CommandHandler::specialSettingUpdated,
                 m_plcAddressConfigWidget, &PLCAddressConfigWidget::reloadConfig);
+        connect(m_responseHandle->commandHandler(), &CommandHandler::settingUpdated,
+                m_systemConfigWidget, &SystemConfigWidget::loadConfig);
     }
     
     m_tabWidget->addTab(m_dataView, "实时数据");
@@ -308,8 +310,12 @@ void MainWindow::onStartSystem() {
     // 线程安全地启动数据采集和发送
     QMetaObject::invokeMethod(m_collector, "startCollection", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_sender, "start", Qt::QueuedConnection);
-    // 压力控制器暂时禁用
-    // m_pressureController->setEnabled(true);
+    
+    // 压力控制器：根据 openPressCtrl 配置决定是否启用写入
+    m_pressureController->reloadConfig();
+    bool pressCtrlEnabled = ConfigManager::instance()->get("openPressCtrl", false).toBool();
+    m_pressureController->setEnabled(pressCtrlEnabled);
+    qInfo() << "压力控制器:" << (pressCtrlEnabled ? "已启用" : "未启用");
     
     m_systemRunning = true;
     
@@ -325,8 +331,7 @@ void MainWindow::onStopSystem() {
     // 线程安全地停止数据采集和发送
     QMetaObject::invokeMethod(m_collector, "stopCollection", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_sender, "stop", Qt::QueuedConnection);
-    // 压力控制器暂时禁用
-    // m_pressureController->setEnabled(false);
+    m_pressureController->setEnabled(false);
     
     m_systemRunning = false;
     
@@ -356,11 +361,9 @@ void MainWindow::onDataCollected(const QMap<QString, QVariant>& data) {
         m_reconnectBtn->setVisible(false);
     }
     
-    // 压力控制器暂时禁用
-    // if (m_pressureController->isEnabled()) {
-    //     QMap<QString, QVariant> controlData = m_pressureController->processData(data);
-    //     if (!controlData.isEmpty()) {
-    //         m_pressureController->writeToPLC(controlData);
-    //     }
-    // }
+    // 压力控制
+    QMap<QString, QVariant> controlData = m_pressureController->processData(data);
+    if (!controlData.isEmpty()) {
+        m_pressureController->writeToPLC(controlData);
+    }
 }

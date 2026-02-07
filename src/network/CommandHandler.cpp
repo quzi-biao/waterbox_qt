@@ -67,21 +67,29 @@ void CommandHandler::handleReadVersion(const QJsonObject& cmd) {
 }
 
 void CommandHandler::handleWriteSetting(const QJsonObject& cmd) {
-    qInfo() << "处理写入设置命令";
+    qInfo() << "处理写入设置命令, 完整内容:" << QJsonDocument(cmd).toJson(QJsonDocument::Compact);
     
-    QString settingStr = cmd.value("setting").toString();
-    if (settingStr.isEmpty()) {
+    QJsonValue settingValue = cmd.value("setting");
+    QJsonObject settingObj;
+    
+    if (settingValue.isObject()) {
+        settingObj = settingValue.toObject();
+    } else if (settingValue.isString()) {
+        QString settingStr = settingValue.toString();
+        if (settingStr.isEmpty()) {
+            qWarning() << "设置内容为空";
+            return;
+        }
+        QJsonDocument doc = QJsonDocument::fromJson(settingStr.toUtf8());
+        if (!doc.isObject()) {
+            qWarning() << "设置格式错误";
+            return;
+        }
+        settingObj = doc.object();
+    } else {
         qWarning() << "设置内容为空";
         return;
     }
-    
-    QJsonDocument doc = QJsonDocument::fromJson(settingStr.toUtf8());
-    if (!doc.isObject()) {
-        qWarning() << "设置格式错误";
-        return;
-    }
-    
-    QJsonObject settingObj = doc.object();
     ConfigManager* config = ConfigManager::instance();
     
     // 遍历所有设置项并更新到 ConfigManager
@@ -110,6 +118,9 @@ void CommandHandler::handleWriteSetting(const QJsonObject& cmd) {
     // 保存配置
     config->save();
     qInfo() << "配置更新成功";
+    
+    // 通知 UI 刷新
+    emit settingUpdated();
     
     // 返回更新后的配置
     if (m_sender && m_sender->isInitialized()) {

@@ -49,13 +49,12 @@ private:
     
     // 新增压力控制配置
     QLineEdit* m_ctrlPressPlcAddressEdit;           // 控制压力的写入地址
+    QLineEdit* m_flowPlcAddressEdit;               // 当前流量数据地址
     QLineEdit* m_pressPeriodControlSettingEdit;     // 分时段控压设置
-    QLineEdit* m_pressCalculatorEdit;               // 压力计算公式
-    QLineEdit* m_endPressDeviceCodeEdit;            // 末端压力设备编码
-    QCheckBox* m_endPressReimCheck;                 // 是否开启末端压力补偿
-    QDoubleSpinBox* m_endPressReimRateSpin;         // 末端压力补偿比率
-    QDoubleSpinBox* m_endPressStandardSpin;         // 末端压力标准值
-    QSpinBox* m_endPressAvgTimeSpin;                // 末端压力均值时间
+    QDoubleSpinBox* m_hstSpin;                       // 建筑高差
+    QDoubleSpinBox* m_h0Spin;                        // 最不利点出流高差
+    QDoubleSpinBox* m_rateSpin;                      // 水头损失
+    QDoubleSpinBox* m_qsSpin;                        // 设计秒流量
 };
 
 #endif

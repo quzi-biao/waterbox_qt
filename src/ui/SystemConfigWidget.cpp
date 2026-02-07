@@ -7,6 +7,8 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QLabel>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 SystemConfigWidget::SystemConfigWidget(QWidget* parent) : QWidget(parent) {
     setupUI();
@@ -134,24 +136,27 @@ void SystemConfigWidget::setupUI() {
     
     // 新增字段
     m_ctrlPressPlcAddressEdit = new QLineEdit(this);
+    m_flowPlcAddressEdit = new QLineEdit(this);
     m_pressPeriodControlSettingEdit = new QLineEdit(this);
-    m_pressCalculatorEdit = new QLineEdit(this);
-    m_endPressDeviceCodeEdit = new QLineEdit(this);
     
-    m_endPressReimCheck = new QCheckBox(this);
+    m_hstSpin = new QDoubleSpinBox(this);
+    m_hstSpin->setRange(0.0, 1000.0);
+    m_hstSpin->setDecimals(2);
+    m_hstSpin->setSuffix(" m");
     
-    m_endPressReimRateSpin = new QDoubleSpinBox(this);
-    m_endPressReimRateSpin->setRange(0.0, 10.0);
-    m_endPressReimRateSpin->setDecimals(2);
+    m_h0Spin = new QDoubleSpinBox(this);
+    m_h0Spin->setRange(0.0, 1000.0);
+    m_h0Spin->setDecimals(2);
+    m_h0Spin->setSuffix(" m");
     
-    m_endPressStandardSpin = new QDoubleSpinBox(this);
-    m_endPressStandardSpin->setRange(0.0, 10.0);
-    m_endPressStandardSpin->setSuffix(" MPa");
-    m_endPressStandardSpin->setDecimals(2);
+    m_rateSpin = new QDoubleSpinBox(this);
+    m_rateSpin->setRange(0.0, 1.0);
+    m_rateSpin->setDecimals(3);
     
-    m_endPressAvgTimeSpin = new QSpinBox(this);
-    m_endPressAvgTimeSpin->setRange(1, 3600);
-    m_endPressAvgTimeSpin->setSuffix(" s");
+    m_qsSpin = new QDoubleSpinBox(this);
+    m_qsSpin->setRange(0.0, 10000.0);
+    m_qsSpin->setDecimals(2);
+    m_qsSpin->setSuffix(" m³/h");
     
     pressLayout->addRow("启用压力控制:", m_openPressCtrlCheck);
     pressLayout->addRow("控制类型:", m_pressCtrlTypeSpin);
@@ -161,13 +166,12 @@ void SystemConfigWidget::setupUI() {
     pressLayout->addRow("压力增长步长:", m_pressIncreaseStepSpin);
     pressLayout->addRow("压力增长间隔:", m_pressIncreaseIntervalSpin);
     pressLayout->addRow("控制压力写入地址:", m_ctrlPressPlcAddressEdit);
+    pressLayout->addRow("当前流量数据地址:", m_flowPlcAddressEdit);
     pressLayout->addRow("分时段控压设置:", m_pressPeriodControlSettingEdit);
-    pressLayout->addRow("压力计算公式:", m_pressCalculatorEdit);
-    pressLayout->addRow("末端压力设备编码:", m_endPressDeviceCodeEdit);
-    pressLayout->addRow("末端压力补偿:", m_endPressReimCheck);
-    pressLayout->addRow("末端压力补偿比率:", m_endPressReimRateSpin);
-    pressLayout->addRow("末端压力标准值:", m_endPressStandardSpin);
-    pressLayout->addRow("末端压力均值时间:", m_endPressAvgTimeSpin);
+    pressLayout->addRow("建筑高差:", m_hstSpin);
+    pressLayout->addRow("最不利点出流高差:", m_h0Spin);
+    pressLayout->addRow("水头损失:", m_rateSpin);
+    pressLayout->addRow("设计秒流量:", m_qsSpin);
     
     rightColumn->addWidget(pressGroup);
     rightColumn->addStretch();
@@ -219,13 +223,20 @@ void SystemConfigWidget::loadConfig() {
     
     // 新增字段
     m_ctrlPressPlcAddressEdit->setText(config->get("ctrlPressPlcAddress", "").toString());
+    m_flowPlcAddressEdit->setText(config->get("flowPlcAddress", "").toString());
     m_pressPeriodControlSettingEdit->setText(config->get("pressPeriodControlSetting", "").toString());
-    m_pressCalculatorEdit->setText(config->get("pressCalculator", "").toString());
-    m_endPressDeviceCodeEdit->setText(config->get("endPressDeviceCode", "").toString());
-    m_endPressReimCheck->setChecked(config->get("endPressReim", false).toBool());
-    m_endPressReimRateSpin->setValue(config->get("endPressReimRate", 1.0).toDouble());
-    m_endPressStandardSpin->setValue(config->get("endPressStandard", 0.3).toDouble());
-    m_endPressAvgTimeSpin->setValue(config->get("endPressAvgTime", 60).toInt());
+    // 压力计算公式（从 JSON 解析）
+    QString pressCalcStr = config->get("pressCalculator", "").toString();
+    if (!pressCalcStr.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(pressCalcStr.toUtf8());
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            m_hstSpin->setValue(obj.value("hst").toString("0").toDouble());
+            m_h0Spin->setValue(obj.value("h0").toString("0").toDouble());
+            m_rateSpin->setValue(obj.value("rate").toString("0").toDouble());
+            m_qsSpin->setValue(obj.value("qs").toString("0").toDouble());
+        }
+    }
 }
 
 void SystemConfigWidget::saveConfig() {
@@ -257,13 +268,16 @@ void SystemConfigWidget::saveConfig() {
     
     // 新增字段
     config->set("ctrlPressPlcAddress", m_ctrlPressPlcAddressEdit->text());
+    config->set("flowPlcAddress", m_flowPlcAddressEdit->text());
     config->set("pressPeriodControlSetting", m_pressPeriodControlSettingEdit->text());
-    config->set("pressCalculator", m_pressCalculatorEdit->text());
-    config->set("endPressDeviceCode", m_endPressDeviceCodeEdit->text());
-    config->set("endPressReim", m_endPressReimCheck->isChecked());
-    config->set("endPressReimRate", m_endPressReimRateSpin->value());
-    config->set("endPressStandard", m_endPressStandardSpin->value());
-    config->set("endPressAvgTime", m_endPressAvgTimeSpin->value());
+    // 压力计算公式（合成 JSON）
+    QJsonObject pressCalcObj;
+    pressCalcObj["realSetting"] = QJsonObject();
+    pressCalcObj["hst"] = QString::number(m_hstSpin->value());
+    pressCalcObj["h0"] = QString::number(m_h0Spin->value());
+    pressCalcObj["rate"] = QString::number(m_rateSpin->value());
+    pressCalcObj["qs"] = QString::number(m_qsSpin->value());
+    config->set("pressCalculator", QString::fromUtf8(QJsonDocument(pressCalcObj).toJson(QJsonDocument::Compact)));
     
     config->save();
     

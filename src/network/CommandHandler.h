@@ -20,6 +20,7 @@ public:
     void handleCommand(const QJsonObject& cmd);
     
 signals:
+    void settingUpdated();
     void specialSettingUpdated();
     
 private:

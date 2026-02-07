@@ -20,39 +20,40 @@ public:
     void setEnabled(bool enabled) override;
     bool isEnabled() const override;
     
-    void setControlPressureAddress(const QString& address);
-    void setEndPressureAddress(const QString& address);
-    void setFlowAddress(const QString& address);
-    
-    void setDefaultPressure(double pressure);
-    void setMinPressure(double pressure);
-    void setMaxPressure(double pressure);
-    void setPressureIncreaseInterval(int seconds);
+    void reloadConfig();
     
 signals:
     void pressureCalculated(double targetPressure, double writePressure);
     
 private:
-    double calculateTargetPressure(const QMap<QString, QVariant>& data);
-    double calculateWritePressure(double targetPressure);
-    double getYesterdayAverageFlow();
-    double get7DayAverageFlow();
+    double getDstPress(double currentFlow);
+    double calDstPress(double currentFlow);
+    double calWritePress(double dstPress);
+    double nearAvgFlow();
     
     IPLCClient* m_plcClient;
     bool m_enabled;
     
-    QString m_controlPressureAddress;
-    QString m_endPressureAddress;
-    QString m_flowAddress;
-    
+    // 配置项（从 ConfigManager 读取）
+    QString m_ctrlPressPlcAddress;
+    QString m_flowPlcAddress;          // 当前流量数据地址
+    int m_pressCtrlType;
     double m_defaultPressure;
     double m_minPressure;
     double m_maxPressure;
-    int m_pressureIncreaseInterval;
+    double m_pressIncreaseStep;
+    int m_pressIncreaseInterval;
     
+    // 压力计算公式参数
+    double m_hst;   // 建筑高差
+    double m_h0;    // 最不利点出流高差
+    double m_rate;  // 水头损失
+    double m_qs;    // 设计秒流量
+    
+    // 运行状态
     qint64 m_lastWriteTime;
-    double m_lastWritePressure;
-    double m_lastTargetPressure;
+    double m_lastCtrlPress;
+    double m_lastWritePress;
 };
 
 #endif

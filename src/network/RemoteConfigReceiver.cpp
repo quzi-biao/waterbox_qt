@@ -37,8 +37,6 @@ void RemoteConfigReceiver::processResponse(const QString& response) {
 void RemoteConfigReceiver::handleCommand(const QJsonObject& cmd) {
     QString cmdType = cmd["cmd"].toString();
     
-    qInfo() << "Processing command:" << cmdType;
-    
     if (cmdType == "update_config") {
         QJsonObject config = cmd["data"].toObject();
         emit configReceived(config);
@@ -58,6 +56,6 @@ void RemoteConfigReceiver::handleCommand(const QJsonObject& cmd) {
         ConfigManager::instance()->set("report_url", url);
         
     } else {
-        qWarning() << "Unknown command:" << cmdType;
+        // readSetting/readVersion/writeSetting 等由 CommandHandler 处理，此处忽略
     }
 }
