@@ -98,7 +98,7 @@ if [ -f /.dockerenv ] || [ "${IN_DOCKER:-0}" = "1" ]; then
 
     echo "[1/3] 安装编译依赖..."
     apt update
-    apt install -y build-essential cmake dpkg-dev \
+    apt install -y build-essential cmake dpkg-dev file \
         qt6-base-dev libqt6charts6-dev libqt6sql6-sqlite \
         libssl-dev zlib1g-dev \
         libgl-dev libegl-dev libxkbcommon-dev
