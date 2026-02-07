@@ -100,7 +100,8 @@ if [ -f /.dockerenv ] || [ "${IN_DOCKER:-0}" = "1" ]; then
     apt update
     apt install -y build-essential cmake \
         qt6-base-dev libqt6charts6-dev libqt6sql6-sqlite \
-        libssl-dev zlib1g-dev
+        libssl-dev zlib1g-dev \
+        libgl-dev libegl-dev libxkbcommon-dev
 
     echo "[2/3] 编译项目..."
     cd /src
