@@ -1,4 +1,5 @@
 #include "MetricIndicator.h"
+#include <QVariant>
 
 MetricIndicator::MetricIndicator()
     : m_id(0),

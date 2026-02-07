@@ -1,4 +1,5 @@
 #include "KeyValue.h"
+#include <QVariant>
 
 KeyValue::KeyValue()
     : m_id(0) {
