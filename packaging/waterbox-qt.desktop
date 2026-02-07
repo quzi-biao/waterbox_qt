@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=WaterBox Qt
+Comment=水务智能监控系统
+Exec=/usr/bin/WaterBoxQt
+Icon=waterbox-qt
+Categories=Utility;
+Terminal=false
+StartupNotify=true

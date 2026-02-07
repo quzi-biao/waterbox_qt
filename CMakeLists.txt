@@ -118,6 +118,10 @@ install(DIRECTORY zerotier/
     DESTINATION share/waterbox/zerotier
 )
 
+install(FILES packaging/waterbox-qt.desktop
+    DESTINATION share/applications
+)
+
 # CPack DEB 打包配置
 set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGE_NAME "waterbox-qt")
