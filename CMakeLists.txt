@@ -109,3 +109,16 @@ install(TARGETS ${PROJECT_NAME}
 install(DIRECTORY zerotier/
     DESTINATION share/waterbox/zerotier
 )
+
+# CPack DEB 打包配置
+set(CPACK_GENERATOR "DEB")
+set(CPACK_PACKAGE_NAME "waterbox-qt")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "WaterBox Qt 水务智能监控系统")
+set(CPACK_PACKAGE_CONTACT "quzi-biao")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "quzi-biao")
+set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6core6, libqt6widgets6, libqt6network6, libqt6sql6, libqt6charts6, libssl3, zlib1g")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
+include(CPack)
