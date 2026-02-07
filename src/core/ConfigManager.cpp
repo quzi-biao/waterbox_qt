@@ -147,11 +147,11 @@ QString ConfigManager::reportProtocol() const {
 }
 
 int ConfigManager::collectInterval() const {
-    return get("collect_interval", 10000).toInt();
+    return get("pumpMetricReadInterval", 10000).toInt();
 }
 
 int ConfigManager::reportInterval() const {
-    return get("report_interval", 10000).toInt();
+    return get("pumpMetricReadInterval", 10000).toInt();
 }
 
 QJsonObject ConfigManager::dataSchema() const {

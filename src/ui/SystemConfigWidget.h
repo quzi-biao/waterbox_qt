@@ -31,6 +31,7 @@ private:
     QLineEdit* m_plcLocalHostEdit;
     QSpinBox* m_plcPortSpin;
     QComboBox* m_plcProtocolCombo;
+    QSpinBox* m_dataCollectIntervalSpin;            // 数据采集间隔(ms)
     
     // 水箱参数
     QDoubleSpinBox* m_boxLongSpin;

@@ -61,10 +61,16 @@ void SystemConfigWidget::setupUI() {
     m_plcProtocolCombo->addItem("Modbus");  // 先尝试 Modbus
     m_plcProtocolCombo->addItem("S7");
     
+    m_dataCollectIntervalSpin = new QSpinBox(this);
+    m_dataCollectIntervalSpin->setRange(1000, 600000);
+    m_dataCollectIntervalSpin->setSingleStep(1000);
+    m_dataCollectIntervalSpin->setSuffix(" ms");
+    
     plcLayout->addRow("启用 PLC 服务:", m_plcServerCheck);
     plcLayout->addRow("PLC 地址:", m_plcLocalHostEdit);
     plcLayout->addRow("PLC 端口:", m_plcPortSpin);
     plcLayout->addRow("协议类型:", m_plcProtocolCombo);
+    plcLayout->addRow("数据采集间隔:", m_dataCollectIntervalSpin);
     
     leftColumn->addWidget(plcGroup);
     
@@ -205,6 +211,7 @@ void SystemConfigWidget::loadConfig() {
     m_plcLocalHostEdit->setText(config->get("plcLocalHost", "192.168.1.11").toString());
     m_plcPortSpin->setValue(config->get("plcPort", 102).toInt());
     m_plcProtocolCombo->setCurrentText(config->get("plcProtocol", "S7").toString());
+    m_dataCollectIntervalSpin->setValue(config->get("pumpMetricReadInterval", 10000).toInt());
     
     // 水箱参数
     m_boxLongSpin->setValue(config->get("boxLong", 10.0).toDouble());
@@ -250,6 +257,7 @@ void SystemConfigWidget::saveConfig() {
     config->set("plcLocalHost", m_plcLocalHostEdit->text());
     config->set("plcPort", m_plcPortSpin->value());
     config->set("plcProtocol", m_plcProtocolCombo->currentText());
+    config->set("pumpMetricReadInterval", m_dataCollectIntervalSpin->value());
     
     // 水箱参数
     config->set("boxLong", m_boxLongSpin->value());
