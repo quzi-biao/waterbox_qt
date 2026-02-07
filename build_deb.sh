@@ -92,133 +92,68 @@ upload_to_oss() {
 
 echo "=== WaterBox Qt 打包脚本 ==="
 
-# ===== 容器内执行编译和打包 =====
+# ===== 容器内：编译和打包 =====
 if [ -f /.dockerenv ] || [ "${IN_DOCKER:-0}" = "1" ]; then
-
     export DEBIAN_FRONTEND=noninteractive
 
-    echo "[1/5] 安装编译依赖..."
+    echo "[1/3] 安装编译依赖..."
     apt update
     apt install -y build-essential cmake \
         qt6-base-dev libqt6charts6-dev libqt6sql6-sqlite \
-        libssl-dev zlib1g-dev \
-        file wget fuse libfuse2
+        libssl-dev zlib1g-dev
 
-    echo "[2/5] 编译项目..."
+    echo "[2/3] 编译项目..."
     cd /src
     rm -rf build && mkdir -p build && cd build
-    cmake -DCMAKE_INSTALL_PREFIX=/usr ..
+    cmake ..
     make -j$(nproc)
-    make install DESTDIR=/src/AppDir
 
-    echo "[3/5] 准备 AppDir..."
-    mkdir -p /src/AppDir/usr/share/applications
-    mkdir -p /src/AppDir/usr/share/icons/hicolor/256x256/apps
+    echo "[3/3] 生成 DEB 包..."
+    cpack -G DEB
 
-    # 创建 .desktop 文件
-    cat > /src/AppDir/usr/share/applications/${APP_NAME}.desktop << EOF
-[Desktop Entry]
-Type=Application
-Name=WaterBox Qt
-Comment=水务智能监控系统
-Exec=${APP_NAME}
-Icon=${APP_NAME}
-Categories=Utility;
-Terminal=false
-EOF
-
-    # 复制 desktop 文件到 AppDir 根目录（linuxdeploy 需要）
-    cp /src/AppDir/usr/share/applications/${APP_NAME}.desktop /src/AppDir/
-
-    # 创建一个简单的图标（如果没有自定义图标）
-    if [ ! -f /src/AppDir/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png ]; then
-        # 生成一个占位图标
-        apt install -y imagemagick 2>/dev/null || true
-        if command -v convert &>/dev/null; then
-            convert -size 256x256 xc:#1976D2 \
-                -fill white -gravity center -pointsize 48 -annotate 0 "WB" \
-                /src/AppDir/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png
-        else
-            # 最小 PNG（1x1 蓝色像素）作为占位
-            printf '\x89PNG\r\n\x1a\n' > /src/AppDir/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png
-        fi
-    fi
-    cp /src/AppDir/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png /src/AppDir/
-
-    echo "[4/5] 下载 linuxdeploy 并生成 AppImage..."
-    cd /src
-
-    # 下载 linuxdeploy
-    if [ ! -f linuxdeploy-x86_64.AppImage ]; then
-        wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-        chmod +x linuxdeploy-x86_64.AppImage
-    fi
-
-    # 下载 Qt 插件
-    if [ ! -f linuxdeploy-plugin-qt-x86_64.AppImage ]; then
-        wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
-        chmod +x linuxdeploy-plugin-qt-x86_64.AppImage
-    fi
-
-    # 生成 AppImage
-    export QMAKE=/usr/bin/qmake6
-    export EXTRA_QT_PLUGINS="sqldrivers;iconengines"
-    ./linuxdeploy-x86_64.AppImage \
-        --appimage-extract-and-run \
-        --appdir AppDir \
-        --plugin qt \
-        --output appimage
-
-    echo "[5/5] 打包完成"
-    APPIMAGE_FILE=$(ls *.AppImage 2>/dev/null | grep -i waterbox | head -1)
-    if [ -n "$APPIMAGE_FILE" ]; then
-        # 重命名为统一格式
-        FINAL_NAME="${APP_NAME}-${APP_VERSION}-x86_64.AppImage"
-        mv "$APPIMAGE_FILE" "/src/${FINAL_NAME}"
-        echo "生成文件: /src/${FINAL_NAME}"
+    DEB_FILE=$(ls *.deb 2>/dev/null | head -1)
+    if [ -n "$DEB_FILE" ]; then
+        cp "$DEB_FILE" /src/
+        echo "容器内打包完成: /src/$DEB_FILE"
     else
-        echo "错误: 未找到 AppImage 文件"
+        echo "错误: 未找到 .deb 文件"
         exit 1
     fi
 
+# ===== 宿主机：启动 Docker 编译，然后上传 =====
 else
-    # ===== 宿主机：通过 Docker 编译 =====
     if ! command -v docker &>/dev/null; then
-        echo "错误: 需要 Docker"
-        echo "请安装 Docker: https://docs.docker.com/engine/install/"
+        echo "错误: 需要安装 Docker"
+        echo "请安装: https://docs.docker.com/engine/install/"
         exit 1
     fi
 
-    echo "使用 Docker (Ubuntu 22.04) 编译打包..."
+    echo "使用 Docker (Ubuntu 22.04) 编译..."
     docker run --rm \
-        --privileged \
         -v "$SCRIPT_DIR":/src \
         -e IN_DOCKER=1 \
         ubuntu:22.04 \
         bash /src/build_deb.sh
 
-    APPIMAGE_FILE=$(ls "$SCRIPT_DIR"/*.AppImage 2>/dev/null | head -1)
-    if [ -n "$APPIMAGE_FILE" ]; then
-        echo ""
-        echo "========================================="
-        echo "打包成功！"
-        echo "文件: $APPIMAGE_FILE"
-        echo ""
-        echo "使用方式:"
-        echo "  chmod +x $(basename $APPIMAGE_FILE)"
-        echo "  ./$(basename $APPIMAGE_FILE)"
-        echo "========================================="
-
-        # 上传到阿里云 OSS
-        if [ "$OSS_ENABLED" = true ]; then
-            upload_to_oss "$APPIMAGE_FILE"
-        else
-            echo ""
-            echo "未配置 OSS 参数，跳过上传。"
-            echo "添加 --endpoint --key-id --key-secret --bucket 参数可自动上传。"
-        fi
-    else
-        echo "错误: 未找到 AppImage 文件"
+    DEB_FILE=$(ls "$SCRIPT_DIR"/*.deb 2>/dev/null | head -1)
+    if [ -z "$DEB_FILE" ]; then
+        echo "错误: 未找到 .deb 文件"
         exit 1
+    fi
+
+    echo ""
+    echo "========================================="
+    echo "打包成功！"
+    echo "文件: $DEB_FILE"
+    echo "安装命令: sudo dpkg -i $(basename $DEB_FILE)"
+    echo "========================================="
+
+    # 上传到阿里云 OSS
+    if [ "$OSS_ENABLED" = true ]; then
+        upload_to_oss "$DEB_FILE"
+    else
+        echo ""
+        echo "未配置 OSS 参数，跳过上传。"
+        echo "添加 --endpoint --key-id --key-secret --bucket 参数可自动上传。"
     fi
 fi
