@@ -1,5 +1,6 @@
 #include "SystemConfigWidget.h"
 #include "core/ConfigManager.h"
+#include "database/DatabaseManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -9,6 +10,7 @@
 #include <QLabel>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMessageBox>
 
 SystemConfigWidget::SystemConfigWidget(QWidget* parent) : QWidget(parent) {
     setupUI();
@@ -102,6 +104,60 @@ void SystemConfigWidget::setupUI() {
     tankLayout->addRow("水箱数量:", m_boxNumSpin);
     
     leftColumn->addWidget(tankGroup);
+    
+    // 压测模式
+    QGroupBox* stressGroup = new QGroupBox("压测模式", this);
+    QFormLayout* stressLayout = new QFormLayout(stressGroup);
+    
+    m_stressTestCheck = new QCheckBox(this);
+    m_stressDataCountLabel = new QLabel("压测数据: 0 条", this);
+    m_cleanStressDataBtn = new QPushButton("清理压测数据", this);
+    
+    stressLayout->addRow("启用压测模式:", m_stressTestCheck);
+    stressLayout->addRow("", m_stressDataCountLabel);
+    stressLayout->addRow("", m_cleanStressDataBtn);
+    
+    // 压测数据量定时刷新
+    m_stressCountTimer = new QTimer(this);
+    m_stressCountTimer->setInterval(2000);
+    connect(m_stressCountTimer, &QTimer::timeout, this, [this]() {
+        int count = DatabaseManager::instance()->getStressTestDataCount();
+        m_stressDataCountLabel->setText(QString("压测数据: %1 条").arg(count));
+    });
+    
+    // 压测模式开关联动：调整采集间隔最小值，启停计数刷新
+    connect(m_stressTestCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        m_dataCollectIntervalSpin->setMinimum(checked ? 100 : 1000);
+        if (!checked && m_dataCollectIntervalSpin->value() < 1000) {
+            m_dataCollectIntervalSpin->setValue(1000);
+        }
+        if (checked) {
+            m_stressCountTimer->start();
+        } else {
+            m_stressCountTimer->stop();
+        }
+        emit stressTestModeChanged(checked);
+    });
+    
+    // 清理压测数据
+    connect(m_cleanStressDataBtn, &QPushButton::clicked, this, [this]() {
+        int count = DatabaseManager::instance()->getStressTestDataCount();
+        if (count == 0) {
+            QMessageBox::information(this, "提示", "没有压测数据需要清理");
+            return;
+        }
+        int ret = QMessageBox::question(this, "确认", 
+            QString("确定要清理 %1 条压测数据吗？").arg(count),
+            QMessageBox::Yes | QMessageBox::No);
+        if (ret == QMessageBox::Yes) {
+            int deleted = DatabaseManager::instance()->deleteStressTestData();
+            m_stressDataCountLabel->setText(QString("压测数据: 0 条"));
+            QMessageBox::information(this, "完成", QString("已清理 %1 条压测数据").arg(deleted));
+            emit cleanStressTestData();
+        }
+    });
+    
+    leftColumn->addWidget(stressGroup);
     leftColumn->addStretch();
     
     // 右列
@@ -213,6 +269,11 @@ void SystemConfigWidget::loadConfig() {
     m_plcProtocolCombo->setCurrentText(config->get("plcProtocol", "S7").toString());
     m_dataCollectIntervalSpin->setValue(config->get("pumpMetricReadInterval", 10000).toInt());
     
+    // 压测模式
+    m_stressTestCheck->setChecked(config->get("stressTestMode", false).toBool());
+    int stressCount = DatabaseManager::instance()->getStressTestDataCount();
+    m_stressDataCountLabel->setText(QString("压测数据: %1 条").arg(stressCount));
+    
     // 水箱参数
     m_boxLongSpin->setValue(config->get("boxLong", 10.0).toDouble());
     m_boxWideSpin->setValue(config->get("boxWide", 5.0).toDouble());
@@ -258,6 +319,7 @@ void SystemConfigWidget::saveConfig() {
     config->set("plcPort", m_plcPortSpin->value());
     config->set("plcProtocol", m_plcProtocolCombo->currentText());
     config->set("pumpMetricReadInterval", m_dataCollectIntervalSpin->value());
+    config->set("stressTestMode", m_stressTestCheck->isChecked());
     
     // 水箱参数
     config->set("boxLong", m_boxLongSpin->value());

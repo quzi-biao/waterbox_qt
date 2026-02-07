@@ -69,6 +69,10 @@ bool DatabaseManager::createTables() {
     query.exec("CREATE INDEX IF NOT EXISTS idx_timestamp ON plc_data(timestamp)");
     query.exec("CREATE INDEX IF NOT EXISTS idx_uploaded ON plc_data(uploaded)");
     
+    // 添加压测标记字段（兑容旧数据库）
+    query.exec("ALTER TABLE plc_data ADD COLUMN is_stress_test INTEGER DEFAULT 0");
+    query.exec("CREATE INDEX IF NOT EXISTS idx_stress_test ON plc_data(is_stress_test)");
+    
     success = query.exec(
         "CREATE TABLE IF NOT EXISTS kv_storage ("
         "key TEXT PRIMARY KEY, "
@@ -84,19 +88,20 @@ bool DatabaseManager::createTables() {
     return true;
 }
 
-bool DatabaseManager::saveData(const QString& address, const QVariant& rawValue, const QVariant& correctedValue) {
+bool DatabaseManager::saveData(const QString& address, const QVariant& rawValue, const QVariant& correctedValue, bool isStressTest) {
     QMutexLocker locker(&m_mutex);
     
     QSqlQuery query(m_db);
     query.prepare(
-        "INSERT INTO plc_data (timestamp, address, raw_value, corrected_value, uploaded) "
-        "VALUES (:timestamp, :address, :raw_value, :corrected_value, 0)"
+        "INSERT INTO plc_data (timestamp, address, raw_value, corrected_value, uploaded, is_stress_test) "
+        "VALUES (:timestamp, :address, :raw_value, :corrected_value, 0, :is_stress_test)"
     );
     
     query.bindValue(":timestamp", QDateTime::currentMSecsSinceEpoch());
     query.bindValue(":address", address);
     query.bindValue(":raw_value", rawValue.toString());
     query.bindValue(":corrected_value", correctedValue.toString());
+    query.bindValue(":is_stress_test", isStressTest ? 1 : 0);
     
     if (!query.exec()) {
         qWarning() << "Failed to save data:" << query.lastError().text();
@@ -123,7 +128,7 @@ QList<PLCDataRecord> DatabaseManager::getUnuploadedData(int limit) {
     
     QSqlQuery query(m_db);
     query.prepare("SELECT id, timestamp, address, raw_value, corrected_value, uploaded "
-                  "FROM plc_data WHERE uploaded = 0 ORDER BY id LIMIT :limit");
+                  "FROM plc_data WHERE uploaded = 0 AND (is_stress_test = 0 OR is_stress_test IS NULL) ORDER BY id LIMIT :limit");
     query.bindValue(":limit", limit);
     
     if (!query.exec()) {
@@ -265,6 +270,35 @@ QList<MetricIndicator> DatabaseManager::loadMetricIndicators() {
     }
     
     return indicators;
+}
+
+int DatabaseManager::deleteStressTestData() {
+    QMutexLocker locker(&m_mutex);
+    
+    QSqlQuery query(m_db);
+    query.prepare("DELETE FROM plc_data WHERE is_stress_test = 1");
+    
+    if (query.exec()) {
+        int count = query.numRowsAffected();
+        qInfo() << "已清理压测数据:" << count << "条";
+        return count;
+    }
+    
+    qWarning() << "清理压测数据失败:" << query.lastError().text();
+    return -1;
+}
+
+int DatabaseManager::getStressTestDataCount() {
+    QMutexLocker locker(&m_mutex);
+    
+    QSqlQuery query(m_db);
+    query.prepare("SELECT COUNT(*) FROM plc_data WHERE is_stress_test = 1");
+    
+    if (query.exec() && query.next()) {
+        return query.value(0).toInt();
+    }
+    
+    return 0;
 }
 
 void DatabaseManager::cleanOldData(int daysToKeep) {

@@ -7,6 +7,9 @@
 #include <QDoubleSpinBox>
 #include <QComboBox>
 #include <QCheckBox>
+#include <QPushButton>
+#include <QLabel>
+#include <QTimer>
 
 class SystemConfigWidget : public QWidget {
     Q_OBJECT
@@ -19,6 +22,8 @@ public:
     
 signals:
     void configSaved();
+    void stressTestModeChanged(bool enabled);
+    void cleanStressTestData();
     
 private:
     void setupUI();
@@ -56,6 +61,12 @@ private:
     QDoubleSpinBox* m_h0Spin;                        // 最不利点出流高差
     QDoubleSpinBox* m_rateSpin;                      // 水头损失
     QDoubleSpinBox* m_qsSpin;                        // 设计秒流量
+    
+    // 压测模式
+    QCheckBox* m_stressTestCheck;
+    QPushButton* m_cleanStressDataBtn;
+    QLabel* m_stressDataCountLabel;
+    QTimer* m_stressCountTimer;
 };
 
 #endif

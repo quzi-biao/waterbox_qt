@@ -14,8 +14,9 @@ struct PLCDataRecord {
     QVariant rawValue;
     QVariant correctedValue;
     bool uploaded;
+    bool isStressTest;
     
-    PLCDataRecord() : id(0), uploaded(false) {}
+    PLCDataRecord() : id(0), uploaded(false), isStressTest(false) {}
 };
 
 class DatabaseManager : public QObject {
@@ -27,7 +28,7 @@ public:
     bool initialize();
     void close();
     
-    bool saveData(const QString& address, const QVariant& rawValue, const QVariant& correctedValue);
+    bool saveData(const QString& address, const QVariant& rawValue, const QVariant& correctedValue, bool isStressTest = false);
     bool markAsUploaded(qint64 id);
     
     QList<PLCDataRecord> getUnuploadedData(int limit = 100);
@@ -40,6 +41,8 @@ public:
     QList<class MetricIndicator> loadMetricIndicators();
     
     void cleanOldData(int daysToKeep = 365);
+    int deleteStressTestData();
+    int getStressTestDataCount();
     
 private:
     DatabaseManager();

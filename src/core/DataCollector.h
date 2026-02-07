@@ -11,6 +11,7 @@ class IPLCClient;
 class MetricIndicator;
 class PLCClient;
 class DatabaseManager;
+class StressTestDataGenerator;
 
 class DataCollector : public QObject {
     Q_OBJECT
@@ -22,6 +23,8 @@ public:
     Q_INVOKABLE void startCollection();
     Q_INVOKABLE void stopCollection();
     Q_INVOKABLE void setInterval(int milliseconds);
+    Q_INVOKABLE void setStressTestMode(bool enabled);
+    bool isStressTestMode() const;
     
     Q_INVOKABLE void setDataSchema(const QMap<QString, QString>& schema);
     QList<MetricIndicator> getMetricIndicators() const;
@@ -38,12 +41,15 @@ private:
     QVariant readIndicatorValue(const QString& address, int dataType);
     QVariant correctValue(const QString& address, const QVariant& rawValue);
     QVariant fillMissingValue(const QString& address);
+    void collectStressTestData();
     
     IPLCClient* m_plcClient;
     QTimer* m_timer;
     QMap<QString, QString> m_dataSchema;
     QMap<QString, QVariant> m_latestData;
     QMap<QString, QVariant> m_lastValidData;
+    bool m_stressTestMode;
+    StressTestDataGenerator* m_stressGenerator;
 };
 
 #endif

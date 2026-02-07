@@ -164,6 +164,16 @@ void MainWindow::setupUI() {
                 m_systemConfigWidget, &SystemConfigWidget::loadConfig);
     }
     
+    // 压测模式信号连接（跨线程调用）
+    connect(m_systemConfigWidget, &SystemConfigWidget::stressTestModeChanged,
+            this, [this](bool enabled) {
+                QMetaObject::invokeMethod(m_collector, "setStressTestMode", Qt::QueuedConnection,
+                                          Q_ARG(bool, enabled));
+                int interval = ConfigManager::instance()->get("pumpMetricReadInterval", 10000).toInt();
+                QMetaObject::invokeMethod(m_collector, "setInterval", Qt::QueuedConnection,
+                                          Q_ARG(int, interval));
+            });
+    
     m_tabWidget->addTab(m_dataView, "实时数据");
     m_tabWidget->addTab(m_historyChart, "历史曲线");
     m_tabWidget->addTab(m_systemConfigWidget, "系统配置");
@@ -308,6 +318,13 @@ void MainWindow::checkPLCConnection() {
 void MainWindow::onStartSystem() {
     // 直接启动数据采集，如果 PLC 未连接，DataCollector 会发出 collectionError 信号
     // 线程安全地启动数据采集和发送
+    // 设置采集间隔和压测模式（跨线程调用）
+    bool stressMode = ConfigManager::instance()->get("stressTestMode", false).toBool();
+    int interval = ConfigManager::instance()->get("pumpMetricReadInterval", 10000).toInt();
+    QMetaObject::invokeMethod(m_collector, "setStressTestMode", Qt::QueuedConnection,
+                              Q_ARG(bool, stressMode));
+    QMetaObject::invokeMethod(m_collector, "setInterval", Qt::QueuedConnection,
+                              Q_ARG(int, interval));
     QMetaObject::invokeMethod(m_collector, "startCollection", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_sender, "start", Qt::QueuedConnection);
     
@@ -351,13 +368,21 @@ void MainWindow::updateStatusBar() {
 void MainWindow::onDataCollected(const QMap<QString, QVariant>& data) {
     m_dataView->updateData(data);
     
-    // 数据采集成功，说明 PLC 连接正常
+    // 数据采集成功，更新连接状态
     if (!data.isEmpty() && data.size() > 1) {  // 排除只有时间戳的情况
-        QString host = ConfigManager::instance()->plcHost();
-        int port = ConfigManager::instance()->plcPort();
-        m_plcConnectionLabel->setText(QString("● PLC: 已连接 (%1:%2)").arg(host).arg(port));
-        m_plcConnectionLabel->setStyleSheet("QLabel { padding: 5px; color: #00cc00; font-weight: bold; }");
-        m_plcStatusLabel->setText("PLC: 已连接");  // 同时更新右下角状态
+        bool isStressTest = data.value("_stress_test", false).toBool();
+        if (isStressTest) {
+            m_plcConnectionLabel->setText("● 压测模式运行中");
+            m_plcConnectionLabel->setStyleSheet("QLabel { padding: 5px; color: #1976D2; font-weight: bold; }");
+            m_plcStatusLabel->setText("压测模式");
+        } else {
+            ConfigManager* config = ConfigManager::instance();
+            QString host = config->get("plcLocalHost", config->plcHost()).toString();
+            int port = config->get("plcPort", config->plcPort()).toInt();
+            m_plcConnectionLabel->setText(QString("● PLC: 已连接 (%1:%2)").arg(host).arg(port));
+            m_plcConnectionLabel->setStyleSheet("QLabel { padding: 5px; color: #00cc00; font-weight: bold; }");
+            m_plcStatusLabel->setText("PLC: 已连接");
+        }
         m_reconnectBtn->setVisible(false);
     }
     

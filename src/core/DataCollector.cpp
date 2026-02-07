@@ -1,4 +1,5 @@
 #include "DataCollector.h"
+#include "StressTestDataGenerator.h"
 #include "interfaces/IPLCClient.h"
 #include "plc/PLCClient.h"
 #include "database/DatabaseManager.h"
@@ -9,10 +10,13 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QDateTime>
+#include <QRandomGenerator>
 
 DataCollector::DataCollector(IPLCClient* plcClient, QObject* parent)
     : QObject(parent), 
-      m_plcClient(plcClient) {
+      m_plcClient(plcClient),
+      m_stressTestMode(false),
+      m_stressGenerator(new StressTestDataGenerator()) {
     
     // 初始化时加载配置
     DatabaseManager* db = DatabaseManager::instance();
@@ -74,7 +78,35 @@ QList<MetricIndicator> DataCollector::getMetricIndicators() const {
     return DatabaseManager::instance()->loadMetricIndicators();
 }
 
+void DataCollector::setStressTestMode(bool enabled) {
+    m_stressTestMode = enabled;
+    if (enabled) {
+        m_stressGenerator->initialize();
+        m_dataSchema = m_stressGenerator->dataSchema();
+        qInfo() << "压测模式已开启";
+    } else {
+        m_stressGenerator->reset();
+        qInfo() << "压测模式已关闭";
+    }
+}
+
+bool DataCollector::isStressTestMode() const {
+    return m_stressTestMode;
+}
+
+void DataCollector::collectStressTestData() {
+    QMap<QString, QVariant> data = m_stressGenerator->generateData();
+    m_latestData = data;
+    emit dataCollected(data);
+}
+
 void DataCollector::collectData() {
+    // 压测模式：不访问 PLC，生成模拟数据
+    if (m_stressTestMode) {
+        collectStressTestData();
+        return;
+    }
+    
     // 重新加载配置（以防配置更新）
     if (m_dataSchema.isEmpty()) {
         // 配置为空，跳过采集

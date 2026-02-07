@@ -102,11 +102,15 @@ QWidget* DataViewWidget::createDataCard(const QString& name, const QString& valu
 }
 
 void DataViewWidget::loadMetricIndicators() {
+    loadMetricIndicatorsFromKey("METRIC_INDICATOR_KEY");
+}
+
+void DataViewWidget::loadMetricIndicatorsFromKey(const QString& key) {
     m_addressNames.clear();
     m_addressUnits.clear();
     
     DatabaseManager* db = DatabaseManager::instance();
-    QVariant indicatorValue = db->getKeyValue("METRIC_INDICATOR_KEY");
+    QVariant indicatorValue = db->getKeyValue(key);
     
     if (indicatorValue.isNull() || indicatorValue.toString().isEmpty()) {
         return;
@@ -138,6 +142,11 @@ void DataViewWidget::loadMetricIndicators() {
 }
 
 void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
+    // 压测模式下从 METRIC_INDICATOR_KEY_MOCK 加载指标名称和单位
+    bool isStressTest = data.value("_stress_test", false).toBool();
+    QString indicatorKey = isStressTest ? "METRIC_INDICATOR_KEY_MOCK" : "METRIC_INDICATOR_KEY";
+    loadMetricIndicatorsFromKey(indicatorKey);
+    
     // 更新时间
     qint64 timestamp = data.value("_timestamp", QDateTime::currentMSecsSinceEpoch()).toLongLong();
     QString currentTime = QDateTime::fromMSecsSinceEpoch(timestamp).toString("yyyy-MM-dd hh:mm:ss");
@@ -180,8 +189,8 @@ void DataViewWidget::updateData(const QMap<QString, QVariant>& data) {
     QList<QPair<QString, QVariant>> otherData;
     
     for (auto it = data.begin(); it != data.end(); ++it) {
-        // 跳过时间戳字段
-        if (it.key() == "_timestamp") {
+        // 跳过内部字段
+        if (it.key().startsWith("_")) {
             continue;
         }
         

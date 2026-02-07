@@ -14,6 +14,7 @@ QJsonObject MetricIndicator::toJson() const {
     obj["address"] = m_address;
     obj["writable"] = m_writable;
     obj["dataType"] = m_dataType;
+    obj["name"] = m_name;
     obj["unit"] = m_unit;
     return obj;
 }
@@ -25,6 +26,7 @@ MetricIndicator MetricIndicator::fromJson(const QJsonObject& json) {
     indicator.setAddress(json.value("address").toString());
     indicator.setWritable(json.value("writable").toBool());
     indicator.setDataType(json.value("dataType").toInt());
+    indicator.setName(json.value("name").toString());
     indicator.setUnit(json.value("unit").toString());
     return indicator;
 }

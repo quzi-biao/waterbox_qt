@@ -35,6 +35,9 @@ public:
     int dataType() const { return m_dataType; }
     void setDataType(int dataType) { m_dataType = dataType; }
     
+    QString name() const { return m_name; }
+    void setName(const QString& name) { m_name = name; }
+    
     QString unit() const { return m_unit; }
     void setUnit(const QString& unit) { m_unit = unit; }
     
@@ -47,6 +50,7 @@ private:
     QString m_address;
     bool m_writable;
     int m_dataType;
+    QString m_name;
     QString m_unit;
 };
 

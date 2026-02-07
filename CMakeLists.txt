@@ -66,6 +66,8 @@ set(SOURCES
     src/algorithm/PressureController.h
     src/core/DataCollector.cpp
     src/core/DataCollector.h
+    src/core/StressTestDataGenerator.cpp
+    src/core/StressTestDataGenerator.h
     src/core/DataSender.cpp
     src/core/DataSender.h
     src/simulator/PLCSimulator.cpp

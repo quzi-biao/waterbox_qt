@@ -18,6 +18,7 @@ public:
     
 private:
     void setupUI();
+    void loadMetricIndicatorsFromKey(const QString& key);
     QWidget* createDataCard(const QString& name, const QString& value, const QString& unit, const QString& address, int width = 180);
     
     QScrollArea* m_scrollArea;
