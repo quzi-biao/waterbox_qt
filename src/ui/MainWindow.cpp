@@ -209,11 +209,12 @@ void MainWindow::createStatusBar() {
 }
 
 void MainWindow::onConnectPLC() {
-    QString host = "192.168.1.11";  // 硬编码 PLC IP 地址
-    int port = 102;
-    QString protocol = "S7";
+    ConfigManager* config = ConfigManager::instance();
+    QString host = config->get("plcLocalHost", config->plcHost()).toString();
+    int port = config->get("plcPort", config->plcPort()).toInt();
+    QString protocol = config->get("plcProtocol", config->plcProtocol()).toString();
     
-    bool simulate = ConfigManager::instance()->get("plcSimulate", false).toBool();
+    bool simulate = config->get("plcSimulate", false).toBool();
     
     if (simulate) {
         if (m_simulator->connect(host, port)) {
@@ -255,13 +256,15 @@ void MainWindow::onDisconnectPLC() {
     if (m_simulatorMode) {
         m_simulator->disconnect();
     } else {
-        m_plcClient->disconnect();
+        // PLCClient 在工作线程中，必须通过 QueuedConnection 断开
+        QMetaObject::invokeMethod(m_plcClient, "disconnect", Qt::QueuedConnection);
     }
 }
 
 void MainWindow::autoConnectPLC() {
-    // 验证 PLC 地址
-    QString host = ConfigManager::instance()->plcHost();
+    // 验证 PLC 地址（与 onConnectPLC 一致）
+    ConfigManager* config = ConfigManager::instance();
+    QString host = config->get("plcLocalHost", config->plcHost()).toString();
     if (host.isEmpty()) {
         m_plcConnectionLabel->setText("● PLC: 地址未配置");
         m_plcConnectionLabel->setStyleSheet("QLabel { padding: 5px; color: #ff9900; font-weight: bold; }");
@@ -275,23 +278,24 @@ void MainWindow::autoConnectPLC() {
 
 void MainWindow::onConfigUpdated() {
     
-    // 停止当前连接
+    // 先停止数据采集和发送
     if (m_systemRunning) {
         onStopSystem();
     }
-    onDisconnectPLC();
     
-    // 重新加载 DataCollector 的配置（线程安全调用）
-    QMetaObject::invokeMethod(m_collector, "loadMetricIndicators", Qt::QueuedConnection);
-    
-    // 重新加载 DataViewWidget 的配置（在主线程）
-    m_dataView->loadMetricIndicators();
-    
-    // 重新加载历史曲线的地址列表
-    m_historyChart->loadAddressList();
-    
-    // 立即尝试重新连接
-    QTimer::singleShot(500, this, &MainWindow::autoConnectPLC);
+    // 延迟断开 PLC，等待工作线程完成当前操作
+    QTimer::singleShot(500, this, [this]() {
+        onDisconnectPLC();
+        
+        // 重新加载 DataViewWidget 的配置（在主线程）
+        m_dataView->loadMetricIndicators();
+        
+        // 重新加载历史曲线的地址列表
+        m_historyChart->loadAddressList();
+        
+        // 延迟重新连接，确保断开完成
+        QTimer::singleShot(1000, this, &MainWindow::autoConnectPLC);
+    });
 }
 
 void MainWindow::checkPLCConnection() {

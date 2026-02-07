@@ -54,7 +54,6 @@ bool PLCClient::isConnected() const {
 
 QVariant PLCClient::readData(const QString& address) {
     if (!isConnected()) {
-        qWarning() << "Not connected to PLC";
         return QVariant();
     }
     
@@ -63,7 +62,6 @@ QVariant PLCClient::readData(const QString& address) {
 
 QVariant PLCClient::readDataWithType(const QString& address, int dataType) {
     if (!isConnected()) {
-        qWarning() << "Not connected to PLC";
         return QVariant();
     }
     
@@ -77,7 +75,6 @@ QVariant PLCClient::readDataWithType(const QString& address, int dataType) {
 
 bool PLCClient::writeData(const QString& address, const QVariant& value) {
     if (!isConnected()) {
-        qWarning() << "Not connected to PLC";
         return false;
     }
     
