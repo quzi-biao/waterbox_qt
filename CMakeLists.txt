@@ -122,6 +122,14 @@ install(FILES packaging/waterbox-qt.desktop
     DESTINATION share/applications
 )
 
+install(FILES packaging/waterbox-qt.png
+    DESTINATION share/icons/hicolor/256x256/apps
+)
+
+install(FILES packaging/waterbox-qt.svg
+    DESTINATION share/icons/hicolor/scalable/apps
+)
+
 # CPack DEB 打包配置
 set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGE_NAME "waterbox-qt")
